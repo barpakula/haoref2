@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Header } from "@/components/Header";
 import { DeliveryStepper } from "@/components/DeliveryStepper";
 import { AlertCard } from "@/components/AlertCard";
@@ -8,6 +8,7 @@ import { AlertsTab } from "@/components/AlertsTab";
 import { HistoryTab } from "@/components/HistoryTab";
 import { SettingsTab } from "@/components/SettingsTab";
 import { useAlerts } from "@/hooks/useAlerts";
+import { useHaptics } from "@/hooks/useHaptics";
 
 export default function App() {
   const [tab, setTab] = useState<TabId>("map");
@@ -15,11 +16,23 @@ export default function App() {
     () => new URLSearchParams(window.location.search).has("demo")
   );
   const { state, launcher, alertHistory, clearAlerts, triggerDemo } = useAlerts(demoMode);
+  const haptics = useHaptics();
+  const prevPhaseRef = useRef(state.phase);
 
   const isActive = state.phase === "earlyWarning" || state.phase === "missiles";
 
+  // Haptic feedback on phase transitions
+  useEffect(() => {
+    if (prevPhaseRef.current !== state.phase) {
+      if (state.phase === "earlyWarning") haptics.heavy();
+      else if (state.phase === "missiles") haptics.alert();
+      else if (state.phase === "ended") haptics.success();
+      prevPhaseRef.current = state.phase;
+    }
+  }, [state.phase]);
+
   return (
-    <div className="min-h-screen bg-gray-100 pb-20 max-w-md mx-auto relative">
+    <div className="min-h-screen bg-wolt-bg pb-20 max-w-md mx-auto relative">
       <Header />
 
       {tab === "map" && (

@@ -5,3 +5,4 @@ dist/
 .env.local
 .wrangler/
 .DS_Store
+*.tsbuildinfo
