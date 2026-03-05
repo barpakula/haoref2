@@ -16,6 +16,8 @@ export default function App() {
   );
   const { state, launcher, alertHistory, clearAlerts, triggerDemo } = useAlerts(demoMode);
 
+  const isActive = state.phase === "earlyWarning" || state.phase === "missiles";
+
   return (
     <div className="min-h-screen bg-gray-100 pb-20 max-w-md mx-auto relative">
       <Header />
@@ -24,14 +26,15 @@ export default function App() {
         <>
           <DeliveryStepper currentStep={state.currentStep} />
           <AlertCard
-            isActive={state.isActive}
+            phase={state.phase}
             origin={state.origin}
             etaSeconds={state.etaSeconds}
             launcher={launcher}
             affectedCities={state.affectedCities}
+            missileWaves={state.missileWaves}
             latestAlert={state.alerts[0] ?? null}
           />
-          <MissileMap origin={state.origin} isActive={state.isActive} />
+          <MissileMap origin={state.origin} isActive={isActive} />
         </>
       )}
 

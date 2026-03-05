@@ -1,5 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { OrefAlert, MissileOrigin, TrackerState, IRAN_EARLY_WARNING_CATS } from "@/lib/types";
+import {
+  OrefAlert,
+  MissileOrigin,
+  TrackerState,
+  EventPhase,
+  IRAN_EARLY_WARNING_CATS,
+} from "@/lib/types";
 import {
   MOCK_IRAN_EARLY_WARNING,
   MOCK_IRAN_MISSILES,
@@ -11,9 +17,18 @@ const IRAN_ETA_SECONDS = 7 * 60;
 const POLL_INTERVAL = 2000;
 const EVENT_ENDED_TITLE = "האירוע הסתיים";
 
+const INITIAL_STATE: TrackerState = {
+  phase: "idle",
+  origin: null,
+  alerts: [],
+  earlyWarningTime: null,
+  currentStep: 0,
+  etaSeconds: null,
+  affectedCities: [],
+  missileWaves: 0,
+};
+
 function isIranEarlyWarning(alert: OrefAlert): boolean {
-  // Cat 10 is used for BOTH early warning AND "event ended"
-  // Distinguish by title: "האירוע הסתיים" = all-clear, anything else = early warning
   if (alert.title === EVENT_ENDED_TITLE) return false;
   return IRAN_EARLY_WARNING_CATS.includes(alert.cat);
 }
@@ -22,101 +37,122 @@ function isEventEnded(alert: OrefAlert): boolean {
   return alert.title === EVENT_ENDED_TITLE;
 }
 
-function inferOrigin(
-  alert: OrefAlert,
-  hadEarlyWarning: boolean
-): MissileOrigin {
-  if (isEventEnded(alert)) return null;
-  if (isIranEarlyWarning(alert)) return "iran";
-  if (alert.cat === "1" && hadEarlyWarning) return "iran";
-  if (alert.cat === "1") return "lebanon";
-  return null;
+function isMissileAlert(alert: OrefAlert): boolean {
+  return alert.cat === "1";
 }
 
-function getStepForState(
-  origin: MissileOrigin,
-  earlyWarningTime: number | null,
-  hasMissileAlert: boolean
+function stepFromPhase(
+  phase: EventPhase,
+  earlyWarningTime: number | null
 ): number {
-  if (!origin) return 0;
-  if (origin === "iran") {
-    if (!earlyWarningTime) return 1;
-    const elapsed = (Date.now() - earlyWarningTime) / 1000;
-    if (elapsed < 60) return 2;
-    if (elapsed < 180) return 3;
-    if (elapsed < 300) return 4;
-    return 5;
+  switch (phase) {
+    case "idle":
+      return 0;
+    case "earlyWarning": {
+      if (!earlyWarningTime) return 2;
+      const elapsed = (Date.now() - earlyWarningTime) / 1000;
+      if (elapsed < 60) return 2;  // launcher deployed
+      if (elapsed < 180) return 3; // ammo loaded
+      if (elapsed < 300) return 4; // countdown
+      return 5;                    // missile on the way (ETA passed)
+    }
+    case "missiles":
+      return 5; // missile on the way
+    case "ended":
+      return 0;
   }
-  return hasMissileAlert ? 5 : 0;
+}
+
+// Merge new cities into existing set, return new array
+function mergeCities(existing: string[], incoming: string[]): string[] {
+  const set = new Set(existing);
+  for (const city of incoming) {
+    if (city) set.add(city);
+  }
+  return Array.from(set);
 }
 
 export function useAlerts(demoMode: boolean) {
-  const [state, setState] = useState<TrackerState>({
-    isActive: false,
-    origin: null,
-    alerts: [],
-    earlyWarningTime: null,
-    currentStep: 0,
-    etaSeconds: null,
-    affectedCities: [],
-  });
+  const [state, setState] = useState<TrackerState>(INITIAL_STATE);
   const [launcher, setLauncher] = useState(getRandomLauncher());
   const [alertHistory, setAlertHistory] = useState<OrefAlert[]>([]);
   const earlyWarningRef = useRef<number | null>(null);
   const lastAlertIdRef = useRef<string | null>(null);
 
   const processAlert = useCallback((alert: OrefAlert) => {
-    // Skip if we've already seen this exact alert
+    // Dedup: skip if same alert ID
     if (alert.id === lastAlertIdRef.current) return;
     lastAlertIdRef.current = alert.id;
 
-    // Add to local history
+    // Add to history
     setAlertHistory((prev) => [alert, ...prev].slice(0, 100));
 
-    // "האירוע הסתיים" = all-clear, end the active alert
-    if (isEventEnded(alert)) {
-      setState((s) => ({
-        ...s,
-        isActive: false,
-        currentStep: 0,
-        alerts: [alert, ...s.alerts],
-      }));
-      earlyWarningRef.current = null;
-      return;
-    }
+    // STATE MACHINE TRANSITIONS
+    setState((prev) => {
+      const newAlerts = [alert, ...prev.alerts].slice(0, 30);
 
-    const hadEarlyWarning = earlyWarningRef.current !== null;
-    const origin = inferOrigin(alert, hadEarlyWarning);
-
-    if (isIranEarlyWarning(alert) && !earlyWarningRef.current) {
-      earlyWarningRef.current = Date.now();
-      setLauncher(getRandomLauncher());
-    }
-
-    if (origin) {
-      const hasMissileAlert = alert.cat === "1";
-      const step = getStepForState(
-        origin,
-        earlyWarningRef.current,
-        hasMissileAlert
-      );
-
-      let etaSeconds: number | null = null;
-      if (origin === "iran" && earlyWarningRef.current) {
-        const elapsed = (Date.now() - earlyWarningRef.current) / 1000;
-        etaSeconds = Math.max(0, IRAN_ETA_SECONDS - elapsed);
+      // EVENT ENDED → reset to ended phase
+      if (isEventEnded(alert)) {
+        earlyWarningRef.current = null;
+        return {
+          ...INITIAL_STATE,
+          phase: "ended",
+          alerts: newAlerts,
+          affectedCities: prev.affectedCities, // keep cities for display
+        };
       }
 
-      setState((s) => ({
-        isActive: true,
-        origin,
-        alerts: [alert, ...s.alerts.filter((a) => a.id !== alert.id)].slice(0, 20),
-        earlyWarningTime: earlyWarningRef.current,
-        currentStep: step,
-        etaSeconds,
-        affectedCities: alert.data.filter(Boolean),
-      }));
-    }
+      // IRAN EARLY WARNING → transition to earlyWarning phase
+      if (isIranEarlyWarning(alert)) {
+        if (!earlyWarningRef.current) {
+          earlyWarningRef.current = Date.now();
+          setLauncher(getRandomLauncher());
+        }
+        const cities = mergeCities(prev.affectedCities, alert.data);
+        return {
+          phase: "earlyWarning",
+          origin: "iran" as MissileOrigin,
+          alerts: newAlerts,
+          earlyWarningTime: earlyWarningRef.current,
+          currentStep: stepFromPhase("earlyWarning", earlyWarningRef.current),
+          etaSeconds: IRAN_ETA_SECONDS,
+          affectedCities: cities,
+          missileWaves: prev.missileWaves,
+        };
+      }
+
+      // MISSILE ALERT → transition to missiles phase
+      if (isMissileAlert(alert)) {
+        const hadEarlyWarning = earlyWarningRef.current !== null;
+        const origin: MissileOrigin = hadEarlyWarning ? "iran" : "lebanon";
+        const cities = mergeCities(prev.affectedCities, alert.data);
+        const waves = prev.missileWaves + 1;
+
+        if (origin === "lebanon" && !earlyWarningRef.current) {
+          setLauncher(getRandomLauncher());
+        }
+
+        let etaSeconds: number | null = null;
+        if (origin === "iran" && earlyWarningRef.current) {
+          const elapsed = (Date.now() - earlyWarningRef.current) / 1000;
+          etaSeconds = Math.max(0, IRAN_ETA_SECONDS - elapsed);
+        }
+
+        return {
+          phase: "missiles",
+          origin,
+          alerts: newAlerts,
+          earlyWarningTime: earlyWarningRef.current,
+          currentStep: 5,
+          etaSeconds,
+          affectedCities: cities,
+          missileWaves: waves,
+        };
+      }
+
+      // Unknown alert type — just add to alerts, don't change phase
+      return { ...prev, alerts: newAlerts };
+    });
   }, []);
 
   // Poll real API
@@ -127,7 +163,6 @@ export function useAlerts(demoMode: boolean) {
       try {
         const res = await fetch("/api/alerts");
         const text = await res.text();
-        // The API returns a BOM + JSON object (not array) when active, empty string when inactive
         const cleaned = text.replace(/^\uFEFF/, "").trim();
         if (cleaned) {
           const data = JSON.parse(cleaned);
@@ -136,7 +171,7 @@ export function useAlerts(demoMode: boolean) {
           }
         }
       } catch {
-        // Silently fail on poll errors
+        // Silently fail
       }
     };
 
@@ -145,17 +180,13 @@ export function useAlerts(demoMode: boolean) {
     return () => clearInterval(interval);
   }, [demoMode, processAlert]);
 
-  // Update step and ETA every second during active alert
+  // Tick every second: update step + ETA countdown during active phases
   useEffect(() => {
-    if (!state.isActive) return;
+    if (state.phase !== "earlyWarning" && state.phase !== "missiles") return;
 
     const interval = setInterval(() => {
       setState((s) => {
-        const step = getStepForState(
-          s.origin,
-          earlyWarningRef.current,
-          s.alerts.some((a) => a.cat === "1")
-        );
+        const step = stepFromPhase(s.phase, earlyWarningRef.current);
         let etaSeconds = s.etaSeconds;
         if (s.origin === "iran" && earlyWarningRef.current) {
           const elapsed = (Date.now() - earlyWarningRef.current) / 1000;
@@ -166,24 +197,17 @@ export function useAlerts(demoMode: boolean) {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [state.isActive]);
+  }, [state.phase]);
 
   const clearAlerts = useCallback(() => {
-    setState({
-      isActive: false,
-      origin: null,
-      alerts: [],
-      earlyWarningTime: null,
-      currentStep: 0,
-      etaSeconds: null,
-      affectedCities: [],
-    });
+    setState(INITIAL_STATE);
     earlyWarningRef.current = null;
     lastAlertIdRef.current = null;
   }, []);
 
   const triggerDemo = useCallback(
     (scenario: "iran" | "lebanon") => {
+      setState(INITIAL_STATE);
       earlyWarningRef.current = null;
       lastAlertIdRef.current = null;
       setLauncher(getRandomLauncher());

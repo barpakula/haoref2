@@ -8,14 +8,18 @@ export interface OrefAlert {
 
 export type MissileOrigin = "iran" | "lebanon" | null;
 
+// Event phases: idle → earlyWarning → missiles → ended
+export type EventPhase = "idle" | "earlyWarning" | "missiles" | "ended";
+
 export interface TrackerState {
-  isActive: boolean;
+  phase: EventPhase;
   origin: MissileOrigin;
   alerts: OrefAlert[];
   earlyWarningTime: number | null;
   currentStep: number;
   etaSeconds: number | null;
-  affectedCities: string[];
+  affectedCities: string[];   // accumulated across all waves
+  missileWaves: number;        // how many cat-1 alerts received
 }
 
 export const ALERT_CATEGORIES: Record<string, string> = {
