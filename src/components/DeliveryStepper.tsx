@@ -5,7 +5,7 @@ const STEPS = [
   { num: 2, label: "משגר\nהוצא", icon: "M20 8h-3V6c0-1.1-.9-2-2-2H9c-1.1 0-2 .9-2 2v2H4c-1.1 0-2 .9-2 2v10h20V10c0-1.1-.9-2-2-2zM9 6h6v2H9V6zm10 12H5v-6h14v6z" },
   { num: 3, label: "חימוש\nטעון", icon: "M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z" },
   { num: 4, label: "ספירה\nלאחור", icon: "M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z" },
-  { num: 5, label: "הטיל\nבדרך!", icon: "M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09zM12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z" },
+  { num: 5, label: "אזעקה!", icon: "M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0" },
 ];
 
 interface Props {
@@ -34,7 +34,8 @@ export function DeliveryStepper({ currentStep }: Props) {
               <div
                 className={clsx(
                   "w-8 h-8 rounded-full flex items-center justify-center transition-all duration-500 relative",
-                  isCurrent && "bg-wolt-blue scale-110 shadow-lg shadow-wolt-blue/30",
+                  isCurrent && step.num === 5 && "bg-wolt-red scale-110 shadow-lg shadow-red-500/30",
+                  isCurrent && step.num !== 5 && "bg-wolt-blue scale-110 shadow-lg shadow-wolt-blue/30",
                   isPast && "bg-wolt-blue",
                   !isActive && "bg-gray-200"
                 )}
@@ -49,13 +50,16 @@ export function DeliveryStepper({ currentStep }: Props) {
                   </svg>
                 )}
                 {isCurrent && (
-                  <div className="absolute inset-0 rounded-full border-2 border-wolt-blue animate-ping opacity-30" />
+                  <div className={clsx(
+                    "absolute inset-0 rounded-full border-2 animate-ping opacity-30",
+                    step.num === 5 ? "border-wolt-red" : "border-wolt-blue"
+                  )} />
                 )}
               </div>
               <span
                 className={clsx(
                   "text-[10px] mt-1.5 text-center whitespace-pre-line leading-tight font-medium transition-colors",
-                  isCurrent ? "text-wolt-blue font-bold" : isActive ? "text-wolt-dark" : "text-gray-400"
+                  isCurrent && step.num === 5 ? "text-wolt-red font-bold" : isCurrent ? "text-wolt-blue font-bold" : isActive ? "text-wolt-dark" : "text-gray-400"
                 )}
               >
                 {step.label}

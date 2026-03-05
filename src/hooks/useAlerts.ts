@@ -49,15 +49,15 @@ function stepFromPhase(
     case "idle":
       return 0;
     case "earlyWarning": {
+      // Steps 2-4 during early warning; step 5 ONLY on actual missile alert
       if (!earlyWarningTime) return 2;
       const elapsed = (Date.now() - earlyWarningTime) / 1000;
-      if (elapsed < 60) return 2;  // launcher deployed
-      if (elapsed < 180) return 3; // ammo loaded
-      if (elapsed < 300) return 4; // countdown
-      return 5;                    // missile on the way (ETA passed)
+      if (elapsed < 120) return 2;  // launcher deployed
+      if (elapsed < 270) return 3;  // ammo loaded
+      return 4;                     // countdown — caps here until real alert
     }
     case "missiles":
-      return 5; // missile on the way
+      return 5; // actual alarm / missile on the way
     case "ended":
       return 0;
   }
@@ -213,7 +213,7 @@ export function useAlerts(demoMode: boolean) {
       setLauncher(getRandomLauncher());
       if (scenario === "iran") {
         processAlert(MOCK_IRAN_EARLY_WARNING);
-        setTimeout(() => processAlert(MOCK_IRAN_MISSILES), 8000);
+        setTimeout(() => processAlert(MOCK_IRAN_MISSILES), 30000);
       } else {
         processAlert(MOCK_LEBANON_MISSILES);
       }
