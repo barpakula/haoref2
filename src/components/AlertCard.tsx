@@ -1,4 +1,4 @@
-import { MissileOrigin } from "@/lib/types";
+import { MissileOrigin, OrefAlert } from "@/lib/types";
 
 interface Props {
   isActive: boolean;
@@ -6,6 +6,7 @@ interface Props {
   etaSeconds: number | null;
   launcher: string;
   affectedCities: string[];
+  latestAlert: OrefAlert | null;
 }
 
 function formatEta(seconds: number): string {
@@ -25,7 +26,19 @@ export function AlertCard({
   etaSeconds,
   launcher,
   affectedCities,
+  latestAlert,
 }: Props) {
+  // "האירוע הסתיים" — event ended, show all-clear
+  if (!isActive && latestAlert?.title === "האירוע הסתיים") {
+    return (
+      <div className="bg-green-700 text-white px-4 py-6 text-center">
+        <p className="text-xl font-bold">האירוע הסתיים</p>
+        <p className="text-sm opacity-90 mt-1">{latestAlert.desc}</p>
+        <p className="text-sm opacity-70 mt-2">ההזמנה הבאה בקרוב... 🥙</p>
+      </div>
+    );
+  }
+
   if (!isActive) {
     return (
       <div className="bg-oref-blue text-white px-4 py-6 text-center">

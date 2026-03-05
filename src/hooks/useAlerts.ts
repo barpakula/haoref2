@@ -9,16 +9,25 @@ import {
 
 const IRAN_ETA_SECONDS = 7 * 60;
 const POLL_INTERVAL = 2000;
+const EVENT_ENDED_TITLE = "האירוע הסתיים";
 
-function isIranEarlyWarning(cat: string): boolean {
-  return IRAN_EARLY_WARNING_CATS.includes(cat);
+function isIranEarlyWarning(alert: OrefAlert): boolean {
+  // Cat 10 is used for BOTH early warning AND "event ended"
+  // Distinguish by title: "האירוע הסתיים" = all-clear, anything else = early warning
+  if (alert.title === EVENT_ENDED_TITLE) return false;
+  return IRAN_EARLY_WARNING_CATS.includes(alert.cat);
+}
+
+function isEventEnded(alert: OrefAlert): boolean {
+  return alert.title === EVENT_ENDED_TITLE;
 }
 
 function inferOrigin(
   alert: OrefAlert,
   hadEarlyWarning: boolean
 ): MissileOrigin {
-  if (isIranEarlyWarning(alert.cat)) return "iran";
+  if (isEventEnded(alert)) return null;
+  if (isIranEarlyWarning(alert)) return "iran";
   if (alert.cat === "1" && hadEarlyWarning) return "iran";
   if (alert.cat === "1") return "lebanon";
   return null;
@@ -52,47 +61,61 @@ export function useAlerts(demoMode: boolean) {
     affectedCities: [],
   });
   const [launcher, setLauncher] = useState(getRandomLauncher());
+  const [alertHistory, setAlertHistory] = useState<OrefAlert[]>([]);
   const earlyWarningRef = useRef<number | null>(null);
+  const lastAlertIdRef = useRef<string | null>(null);
 
-  const processAlerts = useCallback((alerts: OrefAlert[]) => {
-    if (!alerts || alerts.length === 0) return;
+  const processAlert = useCallback((alert: OrefAlert) => {
+    // Skip if we've already seen this exact alert
+    if (alert.id === lastAlertIdRef.current) return;
+    lastAlertIdRef.current = alert.id;
+
+    // Add to local history
+    setAlertHistory((prev) => [alert, ...prev].slice(0, 100));
+
+    // "האירוע הסתיים" = all-clear, end the active alert
+    if (isEventEnded(alert)) {
+      setState((s) => ({
+        ...s,
+        isActive: false,
+        currentStep: 0,
+        alerts: [alert, ...s.alerts],
+      }));
+      earlyWarningRef.current = null;
+      return;
+    }
 
     const hadEarlyWarning = earlyWarningRef.current !== null;
+    const origin = inferOrigin(alert, hadEarlyWarning);
 
-    for (const alert of alerts) {
-      const origin = inferOrigin(alert, hadEarlyWarning);
+    if (isIranEarlyWarning(alert) && !earlyWarningRef.current) {
+      earlyWarningRef.current = Date.now();
+      setLauncher(getRandomLauncher());
+    }
 
-      if (isIranEarlyWarning(alert.cat) && !earlyWarningRef.current) {
-        earlyWarningRef.current = Date.now();
-        setLauncher(getRandomLauncher());
+    if (origin) {
+      const hasMissileAlert = alert.cat === "1";
+      const step = getStepForState(
+        origin,
+        earlyWarningRef.current,
+        hasMissileAlert
+      );
+
+      let etaSeconds: number | null = null;
+      if (origin === "iran" && earlyWarningRef.current) {
+        const elapsed = (Date.now() - earlyWarningRef.current) / 1000;
+        etaSeconds = Math.max(0, IRAN_ETA_SECONDS - elapsed);
       }
 
-      if (origin) {
-        const hasMissileAlert = alert.cat === "1";
-        const step = getStepForState(
-          origin,
-          earlyWarningRef.current,
-          hasMissileAlert
-        );
-        const cities = alerts.flatMap((a) => a.data).filter(Boolean);
-
-        let etaSeconds: number | null = null;
-        if (origin === "iran" && earlyWarningRef.current) {
-          const elapsed = (Date.now() - earlyWarningRef.current) / 1000;
-          etaSeconds = Math.max(0, IRAN_ETA_SECONDS - elapsed);
-        }
-
-        setState({
-          isActive: true,
-          origin,
-          alerts,
-          earlyWarningTime: earlyWarningRef.current,
-          currentStep: step,
-          etaSeconds,
-          affectedCities: cities,
-        });
-        return;
-      }
+      setState((s) => ({
+        isActive: true,
+        origin,
+        alerts: [alert, ...s.alerts.filter((a) => a.id !== alert.id)].slice(0, 20),
+        earlyWarningTime: earlyWarningRef.current,
+        currentStep: step,
+        etaSeconds,
+        affectedCities: alert.data.filter(Boolean),
+      }));
     }
   }, []);
 
@@ -104,14 +127,12 @@ export function useAlerts(demoMode: boolean) {
       try {
         const res = await fetch("/api/alerts");
         const text = await res.text();
-        if (text && text.trim()) {
-          const data = JSON.parse(text);
-          const alerts = Array.isArray(data) ? data : data ? [data] : [];
-          processAlerts(alerts);
-        } else {
-          if (state.isActive) {
-            setState((s) => ({ ...s, isActive: false, currentStep: 0 }));
-            earlyWarningRef.current = null;
+        // The API returns a BOM + JSON object (not array) when active, empty string when inactive
+        const cleaned = text.replace(/^\uFEFF/, "").trim();
+        if (cleaned) {
+          const data = JSON.parse(cleaned);
+          if (data && data.id) {
+            processAlert(data);
           }
         }
       } catch {
@@ -122,7 +143,7 @@ export function useAlerts(demoMode: boolean) {
     poll();
     const interval = setInterval(poll, POLL_INTERVAL);
     return () => clearInterval(interval);
-  }, [demoMode, processAlerts, state.isActive]);
+  }, [demoMode, processAlert]);
 
   // Update step and ETA every second during active alert
   useEffect(() => {
@@ -158,21 +179,23 @@ export function useAlerts(demoMode: boolean) {
       affectedCities: [],
     });
     earlyWarningRef.current = null;
+    lastAlertIdRef.current = null;
   }, []);
 
   const triggerDemo = useCallback(
     (scenario: "iran" | "lebanon") => {
       earlyWarningRef.current = null;
+      lastAlertIdRef.current = null;
       setLauncher(getRandomLauncher());
       if (scenario === "iran") {
-        processAlerts([MOCK_IRAN_EARLY_WARNING]);
-        setTimeout(() => processAlerts([MOCK_IRAN_MISSILES]), 8000);
+        processAlert(MOCK_IRAN_EARLY_WARNING);
+        setTimeout(() => processAlert(MOCK_IRAN_MISSILES), 8000);
       } else {
-        processAlerts([MOCK_LEBANON_MISSILES]);
+        processAlert(MOCK_LEBANON_MISSILES);
       }
     },
-    [processAlerts]
+    [processAlert]
   );
 
-  return { state, launcher, clearAlerts, triggerDemo };
+  return { state, launcher, alertHistory, clearAlerts, triggerDemo };
 }

@@ -14,7 +14,7 @@ export default function App() {
   const [demoMode, setDemoMode] = useState(
     () => new URLSearchParams(window.location.search).has("demo")
   );
-  const { state, launcher, clearAlerts, triggerDemo } = useAlerts(demoMode);
+  const { state, launcher, alertHistory, clearAlerts, triggerDemo } = useAlerts(demoMode);
 
   return (
     <div className="min-h-screen bg-gray-100 pb-20 max-w-md mx-auto relative">
@@ -29,13 +29,14 @@ export default function App() {
             etaSeconds={state.etaSeconds}
             launcher={launcher}
             affectedCities={state.affectedCities}
+            latestAlert={state.alerts[0] ?? null}
           />
           <MissileMap origin={state.origin} isActive={state.isActive} />
         </>
       )}
 
       {tab === "alerts" && <AlertsTab alerts={state.alerts} />}
-      {tab === "history" && <HistoryTab />}
+      {tab === "history" && <HistoryTab history={alertHistory} />}
       {tab === "settings" && (
         <SettingsTab
           demoMode={demoMode}
