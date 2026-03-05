@@ -25,6 +25,10 @@ export const ALERT_CATEGORIES: Record<string, string> = {
   "4": "סכנה כימית",
   "5": "צונאמי",
   "6": "חדירת כלי טיס",
+  "10": "התראה מוקדמת - איראן",
   "13": "חדירת מחבלים",
   "14": "ידיעה מוקדמת",
 };
+
+// Cat 10 = Iran early warning (the real one from the API)
+export const IRAN_EARLY_WARNING_CATS = ["10", "14"];

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { OrefAlert, MissileOrigin, TrackerState } from "@/lib/types";
+import { OrefAlert, MissileOrigin, TrackerState, IRAN_EARLY_WARNING_CATS } from "@/lib/types";
 import {
   MOCK_IRAN_EARLY_WARNING,
   MOCK_IRAN_MISSILES,
@@ -10,11 +10,15 @@ import {
 const IRAN_ETA_SECONDS = 7 * 60;
 const POLL_INTERVAL = 2000;
 
+function isIranEarlyWarning(cat: string): boolean {
+  return IRAN_EARLY_WARNING_CATS.includes(cat);
+}
+
 function inferOrigin(
   alert: OrefAlert,
   hadEarlyWarning: boolean
 ): MissileOrigin {
-  if (alert.cat === "14") return "iran";
+  if (isIranEarlyWarning(alert.cat)) return "iran";
   if (alert.cat === "1" && hadEarlyWarning) return "iran";
   if (alert.cat === "1") return "lebanon";
   return null;
@@ -58,7 +62,7 @@ export function useAlerts(demoMode: boolean) {
     for (const alert of alerts) {
       const origin = inferOrigin(alert, hadEarlyWarning);
 
-      if (alert.cat === "14" && !earlyWarningRef.current) {
+      if (isIranEarlyWarning(alert.cat) && !earlyWarningRef.current) {
         earlyWarningRef.current = Date.now();
         setLauncher(getRandomLauncher());
       }

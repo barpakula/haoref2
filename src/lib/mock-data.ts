@@ -2,7 +2,7 @@ import { OrefAlert } from "./types";
 
 export const MOCK_IRAN_EARLY_WARNING: OrefAlert = {
   id: "mock-iran-ew-1",
-  cat: "14",
+  cat: "10",
   title: "ידיעה מוקדמת",
   data: [],
   desc: "ידיעה מוקדמת על שיגור טילים מאיראן",
