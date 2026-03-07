@@ -126,6 +126,12 @@ export function isCityNearUser(alertCity: string, userCity: string): boolean {
   return false;
 }
 
+/** Look up coordinates for a city by name */
+export function getCityCoordinates(cityName: string): { lat: number; lng: number } | null {
+  const entry = CITY_DATABASE.find((c) => c.name === cityName);
+  return entry ? { lat: entry.lat, lng: entry.lng } : null;
+}
+
 /** Get all unique city names for the selector */
 export function getAllCityNames(): string[] {
   return CITY_DATABASE.map((c) => c.name).sort((a, b) => a.localeCompare(b, "he"));

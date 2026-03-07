@@ -85,9 +85,6 @@ export function isAlertRelevantToUser(alert: OrefAlert, userCity: string | null)
   // Early warning (nationwide) → always relevant
   if (IRAN_EARLY_WARNING_CATS.includes(alert.cat)) return true;
 
-  // Event ended → always show
-  if (alert.title === EVENT_ENDED_TITLE) return true;
-
   // No city data → show (can't filter)
   if (!alert.data || alert.data.length === 0) return true;
 

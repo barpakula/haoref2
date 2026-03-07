@@ -9,7 +9,7 @@ import { BottomNav, TabId } from "@/components/BottomNav";
 import { AlertsTab } from "@/components/AlertsTab";
 import { HistoryTab } from "@/components/HistoryTab";
 import { SettingsTab } from "@/components/SettingsTab";
-import { useAlerts } from "@/hooks/useAlerts";
+import { useAlerts, isAlertRelevantToUser } from "@/hooks/useAlerts";
 import { useHaptics } from "@/hooks/useHaptics";
 import { useUserLocation } from "@/hooks/useUserLocation";
 import { isCityNearUser } from "@/lib/cities";
@@ -33,6 +33,15 @@ export default function App() {
   } = useUserLocation();
 
   const isActive = state.phase === "earlyWarning" || state.phase === "missiles";
+
+  // Display-level filtering when "show only my area" is enabled
+  const filterByArea = showOnlyMyArea && !!userCity;
+  const displayCities = filterByArea
+    ? state.affectedCities.filter((c) => isCityNearUser(c, userCity!))
+    : state.affectedCities;
+  const displayLatestAlert = filterByArea && state.alerts[0]
+    ? (isAlertRelevantToUser(state.alerts[0], userCity) ? state.alerts[0] : null)
+    : (state.alerts[0] ?? null);
 
   // If ended but user's city was never in the affected area, auto-clear to idle
   const userWasAffected = userCity
@@ -68,9 +77,9 @@ export default function App() {
             origin={state.origin}
             etaSeconds={state.etaSeconds}
             launcher={launcher}
-            affectedCities={state.affectedCities}
+            affectedCities={displayCities}
             missileWaves={state.missileWaves}
-            latestAlert={state.alerts[0] ?? null}
+            latestAlert={displayLatestAlert}
             orderName={state.orderName}
             userCity={userCity}
           />
@@ -89,7 +98,7 @@ export default function App() {
               איפוס מצב
             </button>
           )}
-          <MissileMap origin={state.origin} isActive={isActive} />
+          <MissileMap origin={state.origin} isActive={isActive} userCity={userCity} />
         </>
       )}
 
