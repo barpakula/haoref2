@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
-import { EventPhase } from "@/lib/types";
+import { EventPhase, MissileOrigin } from "@/lib/types";
 import { DRIVER_MESSAGES } from "@/lib/mock-data";
 
 interface Props {
   phase: EventPhase;
   launcher: string;
+  origin?: MissileOrigin | null;
 }
 
 const ACTIVE_PHASES = ["earlyWarning", "missiles", "ended"] as const;
@@ -14,22 +15,31 @@ function isActivePhase(phase: EventPhase): phase is ActivePhase {
   return ACTIVE_PHASES.includes(phase as ActivePhase);
 }
 
-export function DriverMessage({ phase, launcher }: Props) {
+function getMessages(phase: ActivePhase, origin?: MissileOrigin | null): string[] {
+  if (phase === "missiles" && origin) {
+    return DRIVER_MESSAGES.missilesByOrigin[origin as "iran" | "lebanon"] ?? DRIVER_MESSAGES.missiles;
+  }
+  return DRIVER_MESSAGES[phase];
+}
+
+export function DriverMessage({ phase, launcher, origin }: Props) {
   const [messageIndex, setMessageIndex] = useState(0);
 
-  // Cycle messages every 4 seconds during active phases
+  // Cycle messages every 15 seconds during active phases
   useEffect(() => {
     if (!isActivePhase(phase)) return;
     setMessageIndex(0);
+    const messages = getMessages(phase, origin);
     const interval = setInterval(() => {
-      setMessageIndex((i) => (i + 1) % DRIVER_MESSAGES[phase].length);
-    }, 4000);
+      setMessageIndex((i) => (i + 1) % messages.length);
+    }, 15000);
     return () => clearInterval(interval);
-  }, [phase]);
+  }, [phase, origin]);
 
   if (!isActivePhase(phase)) return null;
 
-  const message = DRIVER_MESSAGES[phase][messageIndex % DRIVER_MESSAGES[phase].length];
+  const messages = getMessages(phase, origin);
+  const message = messages[messageIndex % messages.length];
 
   return (
     <div className="mx-4 mt-2 animate-slide-up">

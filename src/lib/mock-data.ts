@@ -64,18 +64,19 @@ export function getRandomLauncher(): string {
 export const ORDER_DESCRIPTIONS = [
   "שווארמה בליסטית",
   "פלאפל מונחה GPS",
-  "חומוס עם תוספות נפץ",
-  "פיצה עם אננס וראש נפץ",
+  "גונדי בליסטי מועשר",
+  "קיבה נייה עם ראש נפץ",
   "קבב בין-יבשתי",
   "ג׳חנון מהירות על-קולית",
   "מלאווח מרחף",
   "סביח מפוצל ראשי",
   "בורקס חודר מגן",
   "שקשוקה טרנס-אטמוספרית",
-  "חומוס עילי עם טחינה",
+  "פסנג'אן על-קולי",
   "שניצל פטריוט",
   "קציצות ברזל",
-  "עראייס על-קוליות",
+  "מנקושה מרחפת",
+  "קורמה סבזי מונחה לייזר",
 ];
 
 export function getRandomOrder(): string {
@@ -83,7 +84,12 @@ export function getRandomOrder(): string {
 }
 
 // Driver messages per phase
-export const DRIVER_MESSAGES = {
+export const DRIVER_MESSAGES: {
+  earlyWarning: string[];
+  missiles: string[];
+  missilesByOrigin: { iran: string[]; lebanon: string[] };
+  ended: string[];
+} = {
   earlyWarning: [
     "ההזמנה התקבלה, מתחיל להכין 👨‍🍳",
     "אני כבר במטבח, רגע",
@@ -94,11 +100,28 @@ export const DRIVER_MESSAGES = {
   missiles: [
     "אני בדרך! 🛵",
     "סליחה על העיכוב, פקקים בגבול",
-    "עוד 2 דקות בערך",
-    "מישהו הזמין חומוס?",
+    "עוד כמה דקות",
     "אני כבר ליד, תצאו לקבל",
     "מעביר בין נתיבים, סליחה על הרוח",
   ],
+  missilesByOrigin: {
+    iran: [
+      "אני בדרך! 🛵",
+      "סליחה על העיכוב, פקקים בגבול",
+      "עוד 10-12 דקות בערך",
+      "מישהו הזמין גונדי?",
+      "פסנג'אן חם-חם בדרך",
+      "מעביר בין נתיבים, סליחה על הרוח",
+    ],
+    lebanon: [
+      "אני בדרך! 🛵",
+      "יצאתי מהחוסן, רגע",
+      "עוד דקה-שתיים",
+      "מישהו הזמין קיבה?",
+      "מנקושה טרייה מגיעה!",
+      "שיגור חלק, סליחה על הרוח",
+    ],
+  },
   ended: [
     "השארתי בפתח הממ״ד 📦",
     "תודה על ההזמנה! 🙏",
@@ -108,7 +131,13 @@ export const DRIVER_MESSAGES = {
   ],
 };
 
-export function getDriverMessage(phase: "earlyWarning" | "missiles" | "ended"): string {
-  const messages = DRIVER_MESSAGES[phase];
+export function getDriverMessage(
+  phase: "earlyWarning" | "missiles" | "ended",
+  origin?: "iran" | "lebanon" | null
+): string {
+  const messages =
+    phase === "missiles" && origin
+      ? DRIVER_MESSAGES.missilesByOrigin[origin]
+      : DRIVER_MESSAGES[phase];
   return messages[Math.floor(Math.random() * messages.length)];
 }
