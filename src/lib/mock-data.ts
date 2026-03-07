@@ -39,6 +39,14 @@ export const MOCK_LEBANON_MISSILES: OrefAlert = {
   desc: "היכנסו למרחב המוגן",
 };
 
+export const MOCK_EVENT_ENDED: OrefAlert = {
+  id: "mock-ended-1",
+  cat: "0",
+  title: "האירוע הסתיים",
+  data: [],
+  desc: "ניתן לצאת מהמרחב המוגן",
+};
+
 export const LAUNCHER_NAMES = [
   "ע. כרמניאן",
   "מ. חמינאי ג׳וניור",

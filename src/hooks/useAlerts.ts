@@ -10,6 +10,7 @@ import {
   MOCK_IRAN_EARLY_WARNING,
   MOCK_IRAN_MISSILES,
   MOCK_LEBANON_MISSILES,
+  MOCK_EVENT_ENDED,
   getRandomLauncher,
   getRandomOrder,
 } from "@/lib/mock-data";
@@ -241,27 +242,43 @@ export function useAlerts(demoMode: boolean) {
     return () => clearInterval(interval);
   }, [state.phase]);
 
+  // Track demo timeouts so we can cancel them on reset
+  const demoTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  const clearDemoTimers = useCallback(() => {
+    demoTimersRef.current.forEach(clearTimeout);
+    demoTimersRef.current = [];
+  }, []);
+
   const clearAlerts = useCallback(() => {
+    clearDemoTimers();
     setState(INITIAL_STATE);
     earlyWarningRef.current = null;
     lastAlertIdRef.current = null;
     clearState();
-  }, []);
+  }, [clearDemoTimers]);
 
   const triggerDemo = useCallback(
     (scenario: "iran" | "lebanon") => {
+      clearDemoTimers();
       setState(INITIAL_STATE);
       earlyWarningRef.current = null;
       lastAlertIdRef.current = null;
       setLauncher(getRandomLauncher());
       if (scenario === "iran") {
         processAlert(MOCK_IRAN_EARLY_WARNING);
-        setTimeout(() => processAlert(MOCK_IRAN_MISSILES), 30000);
+        demoTimersRef.current.push(
+          setTimeout(() => processAlert(MOCK_IRAN_MISSILES), 30000),
+          setTimeout(() => processAlert({ ...MOCK_EVENT_ENDED, id: `mock-ended-${Date.now()}` }), 60000)
+        );
       } else {
         processAlert(MOCK_LEBANON_MISSILES);
+        demoTimersRef.current.push(
+          setTimeout(() => processAlert({ ...MOCK_EVENT_ENDED, id: `mock-ended-${Date.now()}` }), 30000)
+        );
       }
     },
-    [processAlert]
+    [processAlert, clearDemoTimers]
   );
 
   return { state, launcher, alertHistory, clearAlerts, triggerDemo };
