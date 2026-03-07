@@ -4,10 +4,12 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { MissileOrigin } from "@/lib/types";
 import { useGeolocation } from "@/hooks/useGeolocation";
+import { getCityCoordinates } from "@/lib/cities";
 
 interface Props {
   origin: MissileOrigin;
   isActive: boolean;
+  userCity: string | null;
 }
 
 const COORDS = {
@@ -148,11 +150,12 @@ function MovingMissile({
   return null;
 }
 
-export function MissileMap({ origin, isActive }: Props) {
+export function MissileMap({ origin, isActive, userCity }: Props) {
   const { position } = useGeolocation();
 
   const fromCoord = origin === "iran" ? COORDS.iran : COORDS.lebanon;
-  const toCoord = COORDS.israel;
+  const userCoords = userCity ? getCityCoordinates(userCity) : null;
+  const toCoord = userCoords ?? COORDS.israel;
 
   const arcPoints = useMemo(() => {
     if (!origin) return [];
