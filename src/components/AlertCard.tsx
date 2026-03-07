@@ -63,9 +63,6 @@ export function AlertCard({
 }: Props) {
   // EVENT ENDED
   if (phase === "ended") {
-    const userWasAffected = userCity
-      ? affectedCities.some((c) => isCityNearUser(c, userCity))
-      : affectedCities.length > 0;
     return (
       <div className="mx-4 mt-3 rounded-2xl overflow-hidden shadow-card animate-slide-up">
         <div className="bg-gradient-to-bl from-wolt-green to-emerald-600 text-white px-5 py-6 text-center relative grain">
@@ -76,11 +73,6 @@ export function AlertCard({
           <p className="text-sm opacity-90 mt-1.5 font-medium">
             {"אפשר לצאת מהמרחב המוגן"}
           </p>
-          {userCity && userWasAffected && (
-            <p className="text-xs text-white/70 mt-1">
-              📍 {userCity} — ההתראה בוטלה
-            </p>
-          )}
           {orderName && (
             <div className="mt-2 inline-flex items-center gap-1.5 bg-white/15 rounded-full px-4 py-1.5">
               <span className="text-sm">{orderName} — נמסר!</span>
