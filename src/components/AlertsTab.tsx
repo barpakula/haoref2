@@ -1,11 +1,19 @@
 import { OrefAlert } from "@/lib/types";
+import { isAlertRelevantToUser } from "@/hooks/useAlerts";
+import { isCityNearUser } from "@/lib/cities";
 
 interface Props {
   alerts: OrefAlert[];
+  userCity: string | null;
+  showOnlyMyArea: boolean;
 }
 
-export function AlertsTab({ alerts }: Props) {
-  if (alerts.length === 0) {
+export function AlertsTab({ alerts, userCity, showOnlyMyArea }: Props) {
+  const filtered = showOnlyMyArea && userCity
+    ? alerts.filter((a) => isAlertRelevantToUser(a, userCity))
+    : alerts;
+
+  if (filtered.length === 0) {
     return (
       <div className="p-8 text-center animate-fade-in">
         <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gray-100 flex items-center justify-center">
@@ -16,14 +24,18 @@ export function AlertsTab({ alerts }: Props) {
           </svg>
         </div>
         <p className="text-lg font-bold text-wolt-dark">{"\u05D0\u05D9\u05DF \u05D4\u05EA\u05E8\u05D0\u05D5\u05EA \u05E4\u05E2\u05D9\u05DC\u05D5\u05EA"}</p>
-        <p className="text-sm text-gray-400 mt-1">{"\u05E0\u05D5\u05D3\u05D9\u05E2 \u05DC\u05DA \u05DB\u05E9\u05D9\u05D4\u05D9\u05D4 \u05DE\u05E9\u05D4\u05D5 \u05DE\u05E2\u05E0\u05D9\u05D9\u05DF"}</p>
+        <p className="text-sm text-gray-400 mt-1">
+          {showOnlyMyArea && userCity
+            ? `אין התראות באזור ${userCity}`
+            : "\u05E0\u05D5\u05D3\u05D9\u05E2 \u05DC\u05DA \u05DB\u05E9\u05D9\u05D4\u05D9\u05D4 \u05DE\u05E9\u05D4\u05D5 \u05DE\u05E2\u05E0\u05D9\u05D9\u05DF"}
+        </p>
       </div>
     );
   }
 
   return (
     <div className="p-4 space-y-3">
-      {alerts.map((alert, i) => (
+      {filtered.map((alert, i) => (
         <div
           key={`${alert.id}-${i}`}
           className="bg-white rounded-2xl p-4 shadow-card animate-slide-up"
@@ -42,14 +54,21 @@ export function AlertsTab({ alerts }: Props) {
           )}
           {alert.data.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
-              {alert.data.map((city) => (
-                <span
-                  key={city}
-                  className="text-xs bg-red-50 text-red-600 px-2.5 py-1 rounded-lg font-medium"
-                >
-                  {city}
-                </span>
-              ))}
+              {alert.data.map((city) => {
+                const isUserArea = userCity ? isCityNearUser(city, userCity) : false;
+                return (
+                  <span
+                    key={city}
+                    className={`text-xs px-2.5 py-1 rounded-lg font-medium ${
+                      isUserArea
+                        ? "bg-red-600 text-white ring-1 ring-red-400"
+                        : "bg-red-50 text-red-600"
+                    }`}
+                  >
+                    {city}
+                  </span>
+                );
+              })}
             </div>
           )}
         </div>

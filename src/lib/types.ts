@@ -20,6 +20,7 @@ export interface TrackerState {
   etaSeconds: number | null;
   affectedCities: string[];   // accumulated across all waves
   missileWaves: number;        // how many cat-1 alerts received
+  orderName: string;           // funny Wolt-style "order" name
 }
 
 export const ALERT_CATEGORIES: Record<string, string> = {

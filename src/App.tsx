@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from "react";
 import { Header } from "@/components/Header";
 import { DeliveryStepper } from "@/components/DeliveryStepper";
 import { AlertCard } from "@/components/AlertCard";
+import { DriverMessage } from "@/components/DriverMessage";
+import { RatingCard } from "@/components/RatingCard";
 import { MissileMap } from "@/components/MissileMap";
 import { BottomNav, TabId } from "@/components/BottomNav";
 import { AlertsTab } from "@/components/AlertsTab";
@@ -9,6 +11,7 @@ import { HistoryTab } from "@/components/HistoryTab";
 import { SettingsTab } from "@/components/SettingsTab";
 import { useAlerts } from "@/hooks/useAlerts";
 import { useHaptics } from "@/hooks/useHaptics";
+import { useUserLocation } from "@/hooks/useUserLocation";
 
 export default function App() {
   const [tab, setTab] = useState<TabId>("map");
@@ -18,6 +21,15 @@ export default function App() {
   const { state, launcher, alertHistory, clearAlerts, triggerDemo } = useAlerts(demoMode);
   const haptics = useHaptics();
   const prevPhaseRef = useRef(state.phase);
+  const {
+    userCity,
+    setUserCity,
+    showOnlyMyArea,
+    setShowOnlyMyArea,
+    detecting,
+    detectLocation,
+    allCities,
+  } = useUserLocation();
 
   const isActive = state.phase === "earlyWarning" || state.phase === "missiles";
 
@@ -46,12 +58,24 @@ export default function App() {
             affectedCities={state.affectedCities}
             missileWaves={state.missileWaves}
             latestAlert={state.alerts[0] ?? null}
+            orderName={state.orderName}
+            userCity={userCity}
           />
+          <DriverMessage phase={state.phase} launcher={launcher} />
+          {state.phase === "ended" && (
+            <RatingCard launcher={launcher} orderName={state.orderName} />
+          )}
           <MissileMap origin={state.origin} isActive={isActive} />
         </>
       )}
 
-      {tab === "alerts" && <AlertsTab alerts={state.alerts} />}
+      {tab === "alerts" && (
+        <AlertsTab
+          alerts={state.alerts}
+          userCity={userCity}
+          showOnlyMyArea={showOnlyMyArea}
+        />
+      )}
       {tab === "history" && <HistoryTab history={alertHistory} />}
       {tab === "settings" && (
         <SettingsTab
@@ -59,6 +83,13 @@ export default function App() {
           onToggleDemo={() => setDemoMode((d) => !d)}
           onTriggerDemo={triggerDemo}
           onClear={clearAlerts}
+          userCity={userCity}
+          onSetCity={setUserCity}
+          showOnlyMyArea={showOnlyMyArea}
+          onToggleShowOnlyMyArea={setShowOnlyMyArea}
+          detecting={detecting}
+          onDetectLocation={detectLocation}
+          allCities={allCities}
         />
       )}
 

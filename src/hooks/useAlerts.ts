@@ -11,7 +11,10 @@ import {
   MOCK_IRAN_MISSILES,
   MOCK_LEBANON_MISSILES,
   getRandomLauncher,
+  getRandomOrder,
 } from "@/lib/mock-data";
+import { saveState, loadState, clearState } from "@/lib/storage";
+import { isCityNearUser } from "@/lib/cities";
 
 const IRAN_ETA_SECONDS = 7 * 60;
 const POLL_INTERVAL = 2000;
@@ -26,6 +29,7 @@ const INITIAL_STATE: TrackerState = {
   etaSeconds: null,
   affectedCities: [],
   missileWaves: 0,
+  orderName: "",
 };
 
 function isIranEarlyWarning(alert: OrefAlert): boolean {
@@ -72,12 +76,45 @@ function mergeCities(existing: string[], incoming: string[]): string[] {
   return Array.from(set);
 }
 
+/** Check if an alert is relevant to the user's location */
+export function isAlertRelevantToUser(alert: OrefAlert, userCity: string | null): boolean {
+  // No city set → show everything
+  if (!userCity) return true;
+
+  // Early warning (nationwide) → always relevant
+  if (IRAN_EARLY_WARNING_CATS.includes(alert.cat)) return true;
+
+  // Event ended → always show
+  if (alert.title === EVENT_ENDED_TITLE) return true;
+
+  // No city data → show (can't filter)
+  if (!alert.data || alert.data.length === 0) return true;
+
+  // Check if any city in the alert matches user's area
+  return alert.data.some((city) => isCityNearUser(city, userCity));
+}
+
 export function useAlerts(demoMode: boolean) {
-  const [state, setState] = useState<TrackerState>(INITIAL_STATE);
-  const [launcher, setLauncher] = useState(getRandomLauncher());
-  const [alertHistory, setAlertHistory] = useState<OrefAlert[]>([]);
-  const earlyWarningRef = useRef<number | null>(null);
-  const lastAlertIdRef = useRef<string | null>(null);
+  // Try to restore persisted state
+  const persisted = useRef(loadState());
+  const [state, setState] = useState<TrackerState>(
+    persisted.current?.state ?? INITIAL_STATE
+  );
+  const [launcher, setLauncher] = useState(
+    persisted.current?.launcher ?? getRandomLauncher()
+  );
+  const [alertHistory, setAlertHistory] = useState<OrefAlert[]>(
+    persisted.current?.alertHistory ?? []
+  );
+  const earlyWarningRef = useRef<number | null>(state.earlyWarningTime);
+  const lastAlertIdRef = useRef<string | null>(
+    state.alerts.length > 0 ? state.alerts[0].id : null
+  );
+
+  // Persist state on every change
+  useEffect(() => {
+    saveState(state, alertHistory, launcher);
+  }, [state, alertHistory, launcher]);
 
   const processAlert = useCallback((alert: OrefAlert) => {
     // Dedup: skip if same alert ID
@@ -99,12 +136,14 @@ export function useAlerts(demoMode: boolean) {
           phase: "ended",
           alerts: newAlerts,
           affectedCities: prev.affectedCities, // keep cities for display
+          orderName: prev.orderName, // keep order for rating screen
         };
       }
 
       // IRAN EARLY WARNING → transition to earlyWarning phase
       if (isIranEarlyWarning(alert)) {
-        if (!earlyWarningRef.current) {
+        const isNewEvent = !earlyWarningRef.current;
+        if (isNewEvent) {
           earlyWarningRef.current = Date.now();
           setLauncher(getRandomLauncher());
         }
@@ -118,6 +157,7 @@ export function useAlerts(demoMode: boolean) {
           etaSeconds: IRAN_ETA_SECONDS,
           affectedCities: cities,
           missileWaves: prev.missileWaves,
+          orderName: isNewEvent ? getRandomOrder() : prev.orderName,
         };
       }
 
@@ -127,8 +167,9 @@ export function useAlerts(demoMode: boolean) {
         const origin: MissileOrigin = hadEarlyWarning ? "iran" : "lebanon";
         const cities = mergeCities(prev.affectedCities, alert.data);
         const waves = prev.missileWaves + 1;
+        const isNewEvent = origin === "lebanon" && !hadEarlyWarning;
 
-        if (origin === "lebanon" && !earlyWarningRef.current) {
+        if (isNewEvent) {
           setLauncher(getRandomLauncher());
         }
 
@@ -147,6 +188,7 @@ export function useAlerts(demoMode: boolean) {
           etaSeconds,
           affectedCities: cities,
           missileWaves: waves,
+          orderName: isNewEvent ? getRandomOrder() : (prev.orderName || getRandomOrder()),
         };
       }
 
@@ -203,6 +245,7 @@ export function useAlerts(demoMode: boolean) {
     setState(INITIAL_STATE);
     earlyWarningRef.current = null;
     lastAlertIdRef.current = null;
+    clearState();
   }, []);
 
   const triggerDemo = useCallback(

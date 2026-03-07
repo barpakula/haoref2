@@ -1,4 +1,5 @@
 import { MissileOrigin, EventPhase, OrefAlert } from "@/lib/types";
+import { isCityNearUser } from "@/lib/cities";
 
 interface Props {
   phase: EventPhase;
@@ -8,6 +9,8 @@ interface Props {
   affectedCities: string[];
   missileWaves: number;
   latestAlert: OrefAlert | null;
+  orderName: string;
+  userCity: string | null;
 }
 
 function formatEta(seconds: number): string {
@@ -55,6 +58,8 @@ export function AlertCard({
   affectedCities,
   missileWaves,
   latestAlert,
+  orderName,
+  userCity,
 }: Props) {
   // EVENT ENDED
   if (phase === "ended") {
@@ -68,9 +73,11 @@ export function AlertCard({
           <p className="text-sm opacity-90 mt-1.5 font-medium">
             {latestAlert?.desc || "\u05D0\u05E4\u05E9\u05E8 \u05DC\u05E6\u05D0\u05EA \u05DE\u05D4\u05DE\u05E8\u05D7\u05D1 \u05D4\u05DE\u05D5\u05D2\u05DF"}
           </p>
-          <div className="mt-3 inline-flex items-center gap-1.5 bg-white/15 rounded-full px-4 py-1.5">
-            <span className="text-sm">{"\u05D4\u05D4\u05D6\u05DE\u05E0\u05D4 \u05D4\u05D1\u05D0\u05D4 \u05D1\u05E7\u05E8\u05D5\u05D1..."}</span>
-          </div>
+          {orderName && (
+            <div className="mt-2 inline-flex items-center gap-1.5 bg-white/15 rounded-full px-4 py-1.5">
+              <span className="text-sm">{orderName} — נמסר!</span>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -96,10 +103,20 @@ export function AlertCard({
           <p className="text-sm text-white/50 mt-1.5 font-medium">
             {"\u05D4\u05DE\u05E9\u05D2\u05E8 \u05D1\u05D4\u05E4\u05E1\u05E7\u05EA \u05E6\u05D4\u05E8\u05D9\u05D9\u05DD"}
           </p>
+          {userCity && (
+            <p className="text-xs text-white/30 mt-2">
+              📍 {userCity}
+            </p>
+          )}
         </div>
       </div>
     );
   }
+
+  // Check if user's city is in the affected area
+  const userIsAffected = userCity
+    ? affectedCities.some((city) => isCityNearUser(city, userCity))
+    : null;
 
   // EARLY WARNING
   if (phase === "earlyWarning") {
@@ -117,6 +134,13 @@ export function AlertCard({
               <p className="text-sm text-white/80 font-medium">{"\u05D4\u05DE\u05E9\u05D2\u05E8:"} {launcher}</p>
             </div>
           </div>
+
+          {orderName && (
+            <div className="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-1.5 mb-3 inline-flex items-center gap-1.5">
+              <span className="text-xs">🧾</span>
+              <span className="text-sm font-medium">{orderName}</span>
+            </div>
+          )}
 
           {etaSeconds !== null && (
             <div className="bg-white/15 backdrop-blur-sm rounded-xl px-4 py-3 mb-3">
@@ -160,6 +184,13 @@ export function AlertCard({
           </div>
         </div>
 
+        {orderName && (
+          <div className="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-1.5 mb-3 inline-flex items-center gap-1.5">
+            <span className="text-xs">🧾</span>
+            <span className="text-sm font-medium">{orderName}</span>
+          </div>
+        )}
+
         {etaSeconds !== null && etaSeconds > 0 && (
           <div className="bg-white/15 backdrop-blur-sm rounded-xl px-4 py-3 mb-3">
             <p className="text-xs text-white/70 font-medium mb-0.5">
@@ -184,20 +215,43 @@ export function AlertCard({
           )}
         </div>
 
+        {/* User location status */}
+        {userCity && userIsAffected !== null && (
+          <div className={`rounded-xl px-4 py-2.5 mb-3 ${
+            userIsAffected
+              ? "bg-yellow-400/20 border border-yellow-300/30"
+              : "bg-white/5"
+          }`}>
+            <p className={`text-sm font-bold ${userIsAffected ? "text-yellow-200" : "text-white/50"}`}>
+              {userIsAffected
+                ? `⚠️ ${userCity} — באזור המאויים!`
+                : `✓ ${userCity} — לא באזור המאויים`
+              }
+            </p>
+          </div>
+        )}
+
         {affectedCities.length > 0 && (
           <div className="bg-white/10 backdrop-blur-sm rounded-xl px-4 py-3">
             <p className="text-xs text-white/70 font-medium mb-2">
               {"\u05D0\u05D6\u05D5\u05E8\u05D9\u05DD \u05DE\u05D0\u05D5\u05D9\u05DE\u05D9\u05DD"} ({affectedCities.length})
             </p>
             <div className="flex flex-wrap gap-1.5">
-              {affectedCities.slice(0, 6).map((city) => (
-                <span
-                  key={city}
-                  className="bg-white/15 rounded-lg px-2.5 py-1 text-xs font-medium"
-                >
-                  {city}
-                </span>
-              ))}
+              {affectedCities.slice(0, 6).map((city) => {
+                const isUserArea = userCity ? isCityNearUser(city, userCity) : false;
+                return (
+                  <span
+                    key={city}
+                    className={`rounded-lg px-2.5 py-1 text-xs font-medium ${
+                      isUserArea
+                        ? "bg-yellow-400/30 text-yellow-100 ring-1 ring-yellow-400/50"
+                        : "bg-white/15"
+                    }`}
+                  >
+                    {city}
+                  </span>
+                );
+              })}
               {affectedCities.length > 6 && (
                 <span className="bg-white/10 rounded-lg px-2.5 py-1 text-xs text-white/60">
                   +{affectedCities.length - 6}
