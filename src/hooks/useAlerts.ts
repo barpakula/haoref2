@@ -119,8 +119,11 @@ export function useAlerts(demoMode: boolean) {
     if (alert.id === lastAlertIdRef.current) return;
     lastAlertIdRef.current = alert.id;
 
-    // Add to history
-    setAlertHistory((prev) => [alert, ...prev].slice(0, 100));
+    // Add to history (deduplicate by ID)
+    setAlertHistory((prev) => {
+      if (prev.some((a) => a.id === alert.id)) return prev;
+      return [alert, ...prev].slice(0, 100);
+    });
 
     // STATE MACHINE TRANSITIONS
     setState((prev) => {
@@ -251,7 +254,7 @@ export function useAlerts(demoMode: boolean) {
     clearDemoTimers();
     setState(INITIAL_STATE);
     earlyWarningRef.current = null;
-    lastAlertIdRef.current = null;
+    // Keep lastAlertIdRef so the same alert isn't reprocessed on next poll
     clearState();
   }, [clearDemoTimers]);
 
