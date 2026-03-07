@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useHaptics } from "@/hooks/useHaptics";
 
 interface Props {
@@ -12,7 +12,17 @@ export function RatingCard({ launcher, orderName }: Props) {
   const [rating, setRating] = useState(0);
   const [selectedTip, setSelectedTip] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
+  const [hidden, setHidden] = useState(false);
   const haptics = useHaptics();
+
+  // Auto-dismiss the thank-you card after 3 seconds
+  useEffect(() => {
+    if (!submitted) return;
+    const t = setTimeout(() => setHidden(true), 3000);
+    return () => clearTimeout(t);
+  }, [submitted]);
+
+  if (hidden) return null;
 
   if (submitted) {
     return (
@@ -34,10 +44,10 @@ export function RatingCard({ launcher, orderName }: Props) {
     <div className="mx-4 mt-2 animate-slide-up">
       <div className="bg-white rounded-2xl p-5 shadow-card">
         <p className="text-center text-sm text-gray-400 mb-1">
-          ההזמנה הגיעה!
+          המשלוח הסתיים!
         </p>
         <p className="text-center font-display text-lg text-wolt-dark mb-1">
-          איך הייתה המשלוח?
+          איך היה המשלוח?
         </p>
         {orderName && (
           <p className="text-center text-xs text-gray-400 mb-3">

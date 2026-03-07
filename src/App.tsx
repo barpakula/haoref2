@@ -12,6 +12,7 @@ import { SettingsTab } from "@/components/SettingsTab";
 import { useAlerts } from "@/hooks/useAlerts";
 import { useHaptics } from "@/hooks/useHaptics";
 import { useUserLocation } from "@/hooks/useUserLocation";
+import { isCityNearUser } from "@/lib/cities";
 
 export default function App() {
   const [tab, setTab] = useState<TabId>("map");
@@ -32,6 +33,18 @@ export default function App() {
   } = useUserLocation();
 
   const isActive = state.phase === "earlyWarning" || state.phase === "missiles";
+
+  // If ended but user's city was never in the affected area, auto-clear to idle
+  const userWasAffected = userCity
+    ? state.affectedCities.some((c) => isCityNearUser(c, userCity))
+    : state.affectedCities.length > 0;
+
+  useEffect(() => {
+    if (state.phase === "ended" && userCity && !userWasAffected) {
+      const t = setTimeout(() => clearAlerts(), 1500);
+      return () => clearTimeout(t);
+    }
+  }, [state.phase, userCity, userWasAffected]);
 
   // Haptic feedback on phase transitions
   useEffect(() => {
@@ -61,7 +74,7 @@ export default function App() {
             orderName={state.orderName}
             userCity={userCity}
           />
-          <DriverMessage phase={state.phase} launcher={launcher} />
+          <DriverMessage phase={state.phase} launcher={launcher} origin={state.origin} />
           {state.phase === "ended" && (
             <RatingCard launcher={launcher} orderName={state.orderName} />
           )}

@@ -66,50 +66,7 @@ function userIcon(): L.DivIcon {
   });
 }
 
-// Animated polyline that draws itself
-function AnimatedArc({ positions }: { positions: [number, number][] }) {
-  const map = useMap();
-  const polyRef = useRef<L.Polyline | null>(null);
-
-  useEffect(() => {
-    if (!map || positions.length === 0) return;
-
-    // Draw trajectory line
-    const line = L.polyline(positions, {
-      color: "#EF4444",
-      weight: 3,
-      opacity: 0,
-      dashArray: "8 6",
-    }).addTo(map);
-
-    // Animate in
-    let frame: number;
-    let progress = 0;
-    const animate = () => {
-      progress += 0.02;
-      if (progress > 1) progress = 1;
-      const count = Math.floor(positions.length * progress);
-      const partial = positions.slice(0, count);
-      if (partial.length > 1) {
-        line.setLatLngs(partial);
-        line.setStyle({ opacity: 0.8 });
-      }
-      if (progress < 1) frame = requestAnimationFrame(animate);
-    };
-    frame = requestAnimationFrame(animate);
-
-    polyRef.current = line;
-
-    return () => {
-      cancelAnimationFrame(frame);
-      map.removeLayer(line);
-    };
-  }, [map, positions]);
-
-  return null;
-}
-
-// Dashed guide line (full path, lighter)
+// Dashed guide line (full path)
 function GuideLine({ positions }: { positions: [number, number][] }) {
   return (
     <Polyline
@@ -122,6 +79,73 @@ function GuideLine({ positions }: { positions: [number, number][] }) {
       }}
     />
   );
+}
+
+// Missile emoji moving along the arc
+function MovingMissile({
+  positions,
+  duration,
+}: {
+  positions: [number, number][];
+  duration: number;
+}) {
+  const map = useMap();
+  const markerRef = useRef<L.Marker | null>(null);
+
+  useEffect(() => {
+    if (!map || positions.length < 2) return;
+
+    const makeIcon = (angleDeg: number) =>
+      L.divIcon({
+        className: "",
+        iconSize: [28, 28],
+        iconAnchor: [14, 14],
+        html: `<div style="font-size:22px;line-height:1;transform:rotate(${angleDeg}deg);display:block;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.4))">🚀</div>`,
+      });
+
+    const marker = L.marker(positions[0], { icon: makeIcon(0) }).addTo(map);
+    markerRef.current = marker;
+
+    let animFrame: number;
+    let startTime: number | null = null;
+    let lastIdx = -1;
+
+    const animate = (timestamp: number) => {
+      if (!startTime) startTime = timestamp;
+      // Loop: use modulo so it restarts automatically
+      const elapsed = (timestamp - startTime) % duration;
+      const t = elapsed / duration;
+      const idx = Math.min(
+        Math.floor(t * (positions.length - 1)),
+        positions.length - 2
+      );
+
+      if (idx !== lastIdx) {
+        lastIdx = idx;
+        const pos = positions[idx];
+        const next = positions[idx + 1];
+        // Compute bearing for rotation (dy=lat diff, dx=lng diff)
+        const dy = next[0] - pos[0];
+        const dx = next[1] - pos[1];
+        const bearing = Math.atan2(dx, dy) * (180 / Math.PI);
+        // 🚀 emoji points northeast by default (~45°), so subtract 45
+        marker.setIcon(makeIcon(bearing - 45));
+      }
+
+      marker.setLatLng(positions[idx]);
+      animFrame = requestAnimationFrame(animate);
+    };
+
+    animFrame = requestAnimationFrame(animate);
+
+    return () => {
+      cancelAnimationFrame(animFrame);
+      map.removeLayer(marker);
+      markerRef.current = null;
+    };
+  }, [map, positions, duration]);
+
+  return null;
 }
 
 export function MissileMap({ origin, isActive }: Props) {
@@ -145,6 +169,9 @@ export function MissileMap({ origin, isActive }: Props) {
     ? [32.5, 35.5]
     : [31.5, 35];
   const zoom = origin === "iran" ? 4.5 : origin === "lebanon" ? 7 : 7;
+
+  // Animation duration: Iran = 45s loop (long distance), Lebanon = 20s loop
+  const missileDuration = origin === "iran" ? 45000 : 20000;
 
   const originIcon = useMemo(() => svgIcon("#F59E0B", 14, true), []);
   const targetIcon = useMemo(() => svgIcon("#EF4444", 14, true), []);
@@ -200,7 +227,7 @@ export function MissileMap({ origin, isActive }: Props) {
         {isActive && origin && arcPoints.length > 0 && (
           <>
             <GuideLine positions={arcPoints} />
-            <AnimatedArc positions={arcPoints} />
+            <MovingMissile positions={arcPoints} duration={missileDuration} />
             <Marker
               position={[fromCoord.lat, fromCoord.lng]}
               icon={originIcon}
