@@ -65,6 +65,17 @@ export default function App() {
           {state.phase === "ended" && (
             <RatingCard launcher={launcher} orderName={state.orderName} />
           )}
+          {state.phase !== "idle" && (
+            <button
+              onClick={() => {
+                haptics.tap();
+                clearAlerts();
+              }}
+              className="mx-4 mt-3 w-[calc(100%-2rem)] bg-white border border-gray-200 text-gray-500 py-2.5 rounded-xl font-medium text-sm active:scale-[0.98] transition-transform shadow-sm"
+            >
+              איפוס מצב
+            </button>
+          )}
           <MissileMap origin={state.origin} isActive={isActive} />
         </>
       )}
